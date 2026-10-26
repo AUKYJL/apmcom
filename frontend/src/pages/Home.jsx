@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Button } from '../components/ui.jsx'
 import { useApp } from '../app-context.jsx'
+import PromotionalProductsSection from '../components/PromotionalProductsSection.jsx'
 
 const STEPS = [
   { title: 'Купите', text: 'любой чай «Лесная Чашка» в магазинах-участниках' },
@@ -95,6 +96,8 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      <PromotionalProductsSection />
 
       <section id="prizes" className="section-band">
         <div className="section container">
