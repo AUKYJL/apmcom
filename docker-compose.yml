@@ -1,0 +1,16 @@
+# Запасной вариант, если PostgreSQL не установлен, а Docker есть:  docker compose up -d
+# Создаёт ту же базу и пользователя, что и setup_db.sql (настройки — как в backend/.env); данные — см. README.md.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: lesnaya_chashka_v2
+      POSTGRES_USER: lesnaya
+      POSTGRES_PASSWORD: lesnaya-local-2026
+    ports:
+      - "5433:5432"
+    volumes:
+      - lesnaya_db:/var/lib/postgresql/data
+
+volumes:
+  lesnaya_db:
