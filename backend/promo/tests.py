@@ -1,3 +1,4 @@
+import os
 import shutil
 import tempfile
 from datetime import datetime
@@ -57,6 +58,66 @@ class AuthTests(APITestCase):
 
     def test_me_requires_auth(self):
         self.assertEqual(self.client.get('/api/me/').status_code, 403)
+
+
+class EmailLoginTests(APITestCase):
+    password = os.environ['TEST_USER_PASSWORD']
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User(email='Ivanov@Test.Local')
+        cls.user.set_password(cls.password)
+        cls.user.save()
+
+    def login(self, email='ivanov@test.local', password=None):
+        return self.client.post('/api/auth/login/', {
+            'email': email,
+            'password': self.password if password is None else password,
+        }, format='json')
+
+    def assert_login_denied(self, **credentials):
+        response = self.login(**credentials)
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(response.data, {'non_field_errors': ['Неверный e-mail или пароль']})
+        self.assertNotIn('_auth_user_id', self.client.session)
+        self.assertEqual(self.client.get('/api/me/').status_code, 403)
+
+    def test_manager_finds_imported_email_case_insensitively(self):
+        for email in ('ivanov@test.local', 'Ivanov@Test.Local', 'IVANOV@TEST.LOCAL'):
+            with self.subTest(email=email):
+                self.assertEqual(User.objects.get_by_natural_key(email), self.user)
+
+    def test_login_with_imported_email_creates_session_without_changing_credentials(self):
+        original_hash = self.user.password
+        for email in ('ivanov@test.local', 'Ivanov@Test.Local', 'IVANOV@TEST.LOCAL'):
+            with self.subTest(email=email):
+                response = self.login(email=email)
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assertEqual(int(self.client.session['_auth_user_id']), self.user.pk)
+                self.assertEqual(self.client.get('/api/me/').data['id'], self.user.pk)
+                self.client.post('/api/auth/logout/')
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, 'Ivanov@Test.Local')
+        self.assertEqual(self.user.password, original_hash)
+
+    def test_wrong_password_is_rejected(self):
+        self.assert_login_denied(password=self.password + '-wrong')
+
+    def test_unknown_email_is_rejected(self):
+        self.assert_login_denied(email='unknown@test.local')
+
+    def test_inactive_user_is_rejected(self):
+        User.objects.filter(pk=self.user.pk).update(is_active=False)
+        self.assert_login_denied()
+
+    def test_unusable_password_is_rejected(self):
+        self.user.set_unusable_password()
+        self.user.save(update_fields=['password'])
+        self.assert_login_denied()
+
+    def test_ambiguous_email_is_rejected(self):
+        User.objects.create_user('ivanov@test.local', self.password)
+        self.assert_login_denied()
 
 
 TEST_MEDIA = tempfile.mkdtemp(prefix='promo-test-media-')

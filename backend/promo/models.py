@@ -30,6 +30,12 @@ REJECT_REASONS = [
 class UserManager(BaseUserManager):
     use_in_migrations = True
 
+    def get_by_natural_key(self, email):
+        try:
+            return self.get(email__iexact=email)
+        except self.model.MultipleObjectsReturned as exc:
+            raise self.model.DoesNotExist from exc
+
     def _create_user(self, email, password, **extra):
         if not email:
             raise ValueError('Нужен e-mail')
